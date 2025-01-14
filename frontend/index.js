@@ -1,43 +1,123 @@
-// App.jsx
 import {
   initializeBlock,
   useBase,
   useGlobalConfig,
+  useLoadable,
+  useWatchable,
+  useCursor,
+  useRecords,
   Box,
   ViewPickerSynced,
-  Button,
+  Input,
+  Text,
+  Heading,
+  RecordCardList,
 } from "@airtable/blocks/ui";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import ProjectOverview from "./components/ProjectOverview";
-
-const GlobalConfigKeys = {
-  VIEW_ID: "viewId",
-};
 
 function App() {
   const base = useBase();
-  const globalConfig = useGlobalConfig();
   const table = base.getTableByName("Projects");
-  const viewId = globalConfig.get(GlobalConfigKeys.VIEW_ID);
-  const view = table.getViewByIdIfExists(viewId);
+  const view = table.getViewByName("All Projects View");
+  const records = useRecords(view);
+
+  // State for search and selected record
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredRecords, setFilteredRecords] = useState([]);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+
+  // Proper cursor implementation
+  const cursor = useCursor();
+  useLoadable(cursor);
+  useWatchable(cursor, ["selectedRecordIds"]);
+
+  // Watch for selected record in Airtable
+  useEffect(() => {
+    if (cursor.selectedRecordIds?.length > 0) {
+      const selected = records?.find(
+        (record) => record.id === cursor.selectedRecordIds[0],
+      );
+      setSelectedRecord(selected);
+    }
+  }, [cursor.selectedRecordIds, records]);
+
+  const handleSearch = (event) => {
+    setSelectedRecord(null);
+    const term = event.target.value.toLowerCase();
+    setSearchTerm(term);
+
+    if (term) {
+      const filtered =
+        records?.filter(
+          (record) =>
+            record.name.toLowerCase().includes(term) ||
+            record.getCellValue("Shortcode")?.toLowerCase().includes(term),
+        ) || [];
+      setFilteredRecords(filtered);
+    } else {
+      setFilteredRecords([]);
+    }
+  };
+
+  // Handle record selection from search
+  const handleRecordSelect = (record) => {
+    setSelectedRecord(record);
+    setSearchTerm("");
+    setFilteredRecords([]);
+  };
 
   return (
-    <div>
-      <Toolbar table={table} />
-      <Box margin={3}>
-        <ProjectOverview view={view} />
+    <Box>
+      <Box padding={2} borderBottom="thick" display="flex" alignItems="center">
+        <Box flex="1">
+          <Input
+            value={searchTerm}
+            placeholder="Search projects..."
+            width="100%"
+            onChange={handleSearch}
+          />
+        </Box>
       </Box>
-    </div>
-  );
-}
 
-function Toolbar({ table }) {
-  return (
-    <Box padding={2} borderBottom="thick" display="flex">
-      <ViewPickerSynced
-        table={table}
-        globalConfigKey={GlobalConfigKeys.VIEW_ID}
-      />
+      {filteredRecords.length > 0 && (
+        <Box
+          height="300px"
+          border="thick"
+          backgroundColor="lightGray1"
+          marginBottom={3}
+        >
+          <RecordCardList
+            records={filteredRecords}
+            onRecordClick={handleRecordSelect}
+          />
+        </Box>
+      )}
+
+      {selectedRecord ? (
+        <Box>
+          <Box marginBottom={2} display="flex" justifyContent="space-between">
+            <Heading>Selected Project</Heading>
+            <Text
+              textColor="light"
+              style={{ cursor: "pointer" }}
+              onClick={() => {
+                setSelectedRecord(null);
+                cursor.setSelectedRecordIds([]);
+              }}
+            >
+              Clear Selection
+            </Text>
+          </Box>
+          <ProjectOverview record={selectedRecord} />
+        </Box>
+      ) : (
+        <Box padding={3}>
+          <Text>
+            Select a project from the table or use the search bar above
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 }
