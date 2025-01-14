@@ -19,9 +19,21 @@ function App() {
   const jobsTable = base.getTableByName("Jobs");
   const notesTable = base.getTableByName("Notes");
   const view = table.getViewByName("All Projects View");
-  const records = useRecords(view);
+  // Pre-fetch all projects with specific fields and sorting - Is this necessary?
+  const records = useRecords(view, {
+    fields: [
+      table.getFieldByName("Name"),
+      table.getFieldByName("Flight Date"),
+      table.getFieldByName("Block"),
+      table.getFieldByName("Site"),
+      table.getFieldByName("Status"),
+      table.getFieldByName("Base Shortcode"),
+      table.getFieldByName("Shortcode"),
+    ],
+    sorts: [{ field: table.getFieldByName("Flight Date"), direction: "desc" }],
+  });
 
-  // Pre-fetch all jobs and notes
+  // Pre-fetch all jobs with specific fields and sorting
   const allJobs = useRecords(jobsTable, {
     fields: [
       jobsTable.getFieldByName("Type"),
@@ -30,6 +42,7 @@ function App() {
       jobsTable.getFieldByName("Created Date"),
       jobsTable.getFieldByName("Date Done"),
     ],
+    sorts: [{ field: jobsTable.getFieldByName("Created Date"), direction: "desc" }],
   });
 
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -50,13 +63,14 @@ function App() {
 
   const handleRecordSelect = (record) => {
     setSelectedRecord(record);
-    cursor.setSelectedRecordIds([record.id]);
+    setIsSearchActive(false); // Ensure ProjectOverview displays when selecting from search
   };
 
   return (
     <Box>
       <SearchBar
         records={records}
+        table={table}
         onSelectRecord={handleRecordSelect}
         onSearchActiveChange={setIsSearchActive}
       />
@@ -71,14 +85,14 @@ function App() {
             margin="0 auto"
           >
             <Heading>
-              {isSearchActive ? "Pick a Project from the List" : "Selected Project"}
+              {isSearchActive ? "Pick a Project from the List" : "Project Overview"}
             </Heading>
             <Text
               textColor="light"
               style={{ cursor: "pointer" }}
               onClick={() => {
                 setSelectedRecord(null);
-                cursor.setSelectedRecordIds([]);
+                // cursor.setSelectedRecordIds([]);
               }}
             >
               Clear Selection

@@ -3,36 +3,35 @@ import {
   Box,
   Heading,
   Text,
-  useBase,
   useRecords,
   RecordCardList,
   Loader,
   ChoiceToken,
 } from "@airtable/blocks/ui";
 
-export default function ProjectOverview({
-  record,
-  isSearchActive,
-  preloadedJobs,
-  jobsTable,
-  notesTable,
-}) {
-  //this only applies when a record is selected and search is not active
-  if (!record || isSearchActive) return null;
+export default function ProjectOverview({ record, isSearchActive, jobsTable, notesTable }) {
+  //All the code below this only applies when a record is selected and search is not active
+  if (!record || isSearchActive) {
+    return null;
+  }
 
-  const createDate = jobsTable.getFieldByName("Created Date");
-
-  // Filter pre-loaded jobs based on the current record's linked jobs
-  const linkedJobIds = record.getCellValue("Jobs")?.map((job) => job.id) || [];
-  const linkedJobs = preloadedJobs
-    .filter((job) => linkedJobIds.includes(job.id))
-    .sort((a, b) => {
-      const dateA = a.getCellValue("Created Date");
-      const dateB = b.getCellValue("Created Date");
-      return dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+  // get only the linked jobs for this record
+  const linkedJobsQuery = React.useMemo(() => {
+    return record?.selectLinkedRecordsFromCell("Jobs", {
+      sorts: [{ field: jobsTable.getFieldByName("Created Date"), direction: "asc" }],
+      fields: [
+        jobsTable.getFieldByName("Type"),
+        jobsTable.getFieldByName("State"),
+        jobsTable.getFieldByName("Created Date"),
+        jobsTable.getFieldByName("Date Done"),
+        jobsTable.getFieldByName("Assignee"),
+      ],
     });
+  }, [record, jobsTable]);
 
-  if (!preloadedJobs) return <Loader />;
+  const linkedJobs = useRecords(linkedJobsQuery);
+
+  if (!linkedJobs) return <Loader />;
 
   const currentStatus = record.getCellValue("Status");
 
@@ -53,9 +52,6 @@ export default function ProjectOverview({
       >
         <Box>
           <Heading size="large">{record.name}</Heading>
-          {/* <Text variant="paragraph" size="large" marginTop={2}> */}
-          {/*   Shortcode: {record.getCellValue("Shortcode")} */}
-          {/* </Text> */}
           <Text variant="paragraph" size="large">
             Base Project: {record.getCellValue("Base Shortcode")?.[0]?.value}
           </Text>
@@ -72,8 +68,17 @@ export default function ProjectOverview({
         </Box>
         <Box height="400px" border="thick" borderRadius={3} width="98%" margin="0 auto">
           <RecordCardList
+            key={record.id} // Add key to force re-render (This fixed job not loading bug)
             records={linkedJobs}
-            fields={[jobsTable.getFieldByName("Type"), jobsTable.getFieldByName("State")]}
+            fields={[
+              jobsTable.getFieldByName("Type"),
+              jobsTable.getFieldByName("State"),
+              jobsTable.getFieldByName("Created Date"),
+              jobsTable.getFieldByName("Date Done"),
+              jobsTable.getFieldByName("Assignee"),
+            ]}
+            height="400px"
+            width="100%"
           />
         </Box>
       </Box>
@@ -101,20 +106,32 @@ export default function ProjectOverview({
   );
 }
 
-// Notes Grid Component
 function NotesGrid({ record, notesTable }) {
+  const [page, setPage] = React.useState(1);
+  const NOTES_PER_PAGE = 10;
+
   const notes = useRecords(
     record.selectLinkedRecordsFromCell("Notes", {
       sorts: [{ field: notesTable.getFieldByName("Created At"), direction: "desc" }],
+      fields: [
+        notesTable.getFieldByName("Created At"),
+        notesTable.getFieldByName("Type"),
+        notesTable.getFieldByName("Custom Comments"),
+        notesTable.getFieldByName("Assignee"),
+      ],
     }),
   );
+
+  const visibleNotes = React.useMemo(() => {
+    return notes?.slice(0, page * NOTES_PER_PAGE) || [];
+  }, [notes, page]);
 
   if (!notes) return <Loader />;
   if (notes.length === 0) return <Text>No notes found</Text>;
 
   return (
     <Box>
-      {notes.map((note) => (
+      {visibleNotes.map((note) => (
         <Box
           key={note.id}
           backgroundColor="lightGray1"
@@ -125,16 +142,30 @@ function NotesGrid({ record, notesTable }) {
           flexDirection="column"
         >
           <Box display="flex" justifyContent="space-between" marginBottom={1}>
-            <Text size="small" textColor="light">
-              {new Date(note.getCellValue("Created At")).toLocaleDateString()}
-            </Text>
-            <Text size="small" textColor="light">
-              {note.getCellValue("Type")}
-            </Text>
+            <Box display="flex" flexDirection="row" alignItems="center">
+              {note.getCellValue("Assignee") && (
+                <ChoiceToken choice={note.getCellValue("Assignee")} marginRight={2} />
+              )}
+              <Text size="small" textColor="light">
+                {new Date(note.getCellValue("Created At")).toLocaleDateString()}
+              </Text>
+            </Box>
+            <Box display="flex" flexDirection="column" alignItems="flex-end">
+              {note.getCellValue("Type") && <ChoiceToken choice={note.getCellValue("Type")} />}
+            </Box>
           </Box>
           <Text>{note.getCellValue("Custom Comments")}</Text>
         </Box>
       ))}
+      {notes.length > visibleNotes.length && (
+        <Box display="flex" justifyContent="center" marginTop={2}>
+          <Text
+            textColor="light"
+            style={{ cursor: "pointer" }}
+            onClick={() => setPage((p) => p + 1)}
+          ></Text>
+        </Box>
+      )}
     </Box>
   );
 }
