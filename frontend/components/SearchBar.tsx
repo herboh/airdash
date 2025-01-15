@@ -1,9 +1,22 @@
 import React from "react";
 import { Box, Input, RecordCardList } from "@airtable/blocks/ui";
+import { AirtableService, Project } from "../airtableService";
 
-export default function SearchBar({ records, table, onSelectRecord, onSearchActiveChange }) {
+interface SearchBarProps {
+  records: Project[];
+  onSelectRecord: (record: Project) => void;
+  onSearchActiveChange: (active: boolean) => void;
+  airtableService: AirtableService;
+}
+
+export default function SearchBar({
+  records,
+  onSelectRecord,
+  onSearchActiveChange,
+  airtableService,
+}: SearchBarProps) {
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [filteredRecords, setFilteredRecords] = React.useState([]);
+  const [filteredRecords, setFilteredRecords] = React.useState<Project[]>([]);
 
   const handleSearch = (event) => {
     const userInput = event.target.value;
@@ -39,27 +52,16 @@ export default function SearchBar({ records, table, onSelectRecord, onSearchActi
         width="98%"
         marginBottom={2}
         marginTop={2}
-        marginX={2}
       />
-      {searchTerm && (
-        <Box
-          height="calc(100vh - 120px)"
-          border="thick"
-          backgroundColor="lightGray1"
-          width="98%"
-          margin="0 auto"
-        >
+      {filteredRecords.length > 0 && (
+        <Box width="98%" margin="0 auto">
           <RecordCardList
             records={filteredRecords}
-            fields={[
-              table.getFieldByName("Name"),
-              table.getFieldByName("Shortcode"),
-              table.getFieldByName("Base Shortcode"),
-              table.getFieldByName("Flight Date"),
-              table.getFieldByName("Status"),
-            ]}
+            fields={airtableService.getProjectCardFields()}
+            width="98%"
+            margin="0 auto"
             onRecordClick={(record) => {
-              onSelectRecord(record);
+              onSelectRecord(record as Project);
               setSearchTerm("");
               setFilteredRecords([]);
             }}
