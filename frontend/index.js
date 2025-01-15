@@ -9,9 +9,12 @@ import {
   Text,
   Heading,
 } from "@airtable/blocks/ui";
+import { cursor } from "@airtable/blocks"; //adding these without a specific use because they seem handy
+import { FieldType } from "@airtable/blocks/models"; //adding these without a specific use because they seem handy
 import React, { useState, useEffect } from "react";
 import ProjectOverview from "./components/ProjectOverview";
 import SearchBar from "./components/SearchBar";
+import RecentProjects from "./components/RecentProjects";
 
 function App() {
   const base = useBase();
@@ -19,7 +22,7 @@ function App() {
   const jobsTable = base.getTableByName("Jobs");
   const notesTable = base.getTableByName("Notes");
   const view = table.getViewByName("All Projects View");
-  // Pre-fetch all projects with specific fields and sorting - Is this necessary?
+  // Pre-fetch all projects with specific fields and sorting
   const records = useRecords(view, {
     fields: [
       table.getFieldByName("Name"),
@@ -31,18 +34,6 @@ function App() {
       table.getFieldByName("Shortcode"),
     ],
     sorts: [{ field: table.getFieldByName("Flight Date"), direction: "desc" }],
-  });
-
-  // Pre-fetch all jobs with specific fields and sorting
-  const allJobs = useRecords(jobsTable, {
-    fields: [
-      jobsTable.getFieldByName("Type"),
-      jobsTable.getFieldByName("State"),
-      jobsTable.getFieldByName("Status"),
-      jobsTable.getFieldByName("Created Date"),
-      jobsTable.getFieldByName("Date Done"),
-    ],
-    sorts: [{ field: jobsTable.getFieldByName("Created Date"), direction: "desc" }],
   });
 
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -61,9 +52,24 @@ function App() {
     }
   }, [cursor.selectedRecordIds, records]);
 
+  // Store recent project IDs in state
+  const [recentProjectIds, setRecentProjectIds] = React.useState(() => {
+    const stored = localStorage.getItem("recentProjectIds");
+    return stored ? JSON.parse(stored) : [];
+  });
+
   const handleRecordSelect = (record) => {
     setSelectedRecord(record);
-    setIsSearchActive(false); // Ensure ProjectOverview displays when selecting from search
+    setIsSearchActive(false);
+
+    // Update recent projects
+    const newRecentIds = [record.id, ...recentProjectIds.filter((id) => id !== record.id)].slice(
+      0,
+      5,
+    ); // Keep only the 5 most recent
+
+    setRecentProjectIds(newRecentIds);
+    localStorage.setItem("recentProjectIds", JSON.stringify(newRecentIds));
   };
 
   return (
@@ -92,25 +98,29 @@ function App() {
               style={{ cursor: "pointer" }}
               onClick={() => {
                 setSelectedRecord(null);
+                setIsSearchActive(false);
                 // cursor.setSelectedRecordIds([]);
               }}
             >
-              Clear Selection
+              Close
             </Text>
           </Box>
-          <Box width="98%" margin="0 auto" padding={3}>
-            <ProjectOverview
-              record={selectedRecord}
-              preloadedJobs={allJobs}
-              jobsTable={jobsTable}
-              notesTable={notesTable}
-              isSearchActive={isSearchActive}
-            />
-          </Box>
+          <ProjectOverview
+            record={selectedRecord}
+            jobsTable={jobsTable}
+            notesTable={notesTable}
+            isSearchActive={isSearchActive}
+          />
         </Box>
       ) : (
         <Box padding={3}>
-          <Text>Select a project from the table or use the search bar above</Text>
+          <Text marginBottom={3}>Select a project from the table or use the search bar above</Text>
+          <RecentProjects
+            table={table}
+            records={records}
+            recentIds={recentProjectIds}
+            onSelectRecord={handleRecordSelect}
+          />
         </Box>
       )}
     </Box>

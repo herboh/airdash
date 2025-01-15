@@ -36,29 +36,61 @@ export default function ProjectOverview({ record, isSearchActive, jobsTable, not
   const currentStatus = record.getCellValue("Status");
 
   return (
-    <Box>
+    <Box margin={1}>
       {/* Project Header Section */}
       <Box
         display="flex"
         alignItems="center"
         justifyContent="space-between"
-        marginBottom={3}
         padding={3}
+        paddingBottom={1}
         border="thick"
-        borderRadius={3}
+        borderRadius="large"
         backgroundColor="lightGray1"
-        width="98%"
-        margin="0 auto"
+        width="100%"
+        boxShadow="0 2px 4px rgba(0,0,0,0.1)"
+        transition="all 0.2s ease"
+        borderColor="Gray2"
       >
-        <Box>
-          <Heading size="large">{record.name}</Heading>
-          <Text variant="paragraph" size="large">
-            Base Project: {record.getCellValue("Base Shortcode")?.[0]?.value}
-          </Text>
-        </Box>
-        <Box>{currentStatus && <ChoiceToken choice={currentStatus} marginRight={1} />}</Box>
-      </Box>
+        <Box display="flex" flexDirection="column" justifyContent="flex-start">
+          <Heading size="large" marginBottom={1} textOverflow="ellipsis" maxWidth="800px">
+            {record.name}
+          </Heading>
 
+          <Box display="flex" flexDirection="column" gap={0.1}>
+            {" "}
+            {/* Added gap for consistent spacing */}
+            <Box display="flex" alignItems="center">
+              <Text variant="paragraph" size="default" color="gray" marginRight={1}>
+                Shortcode:
+              </Text>
+              <Text variant="paragraph" size="default" fontWeight={500}>
+                {record.getCellValue("Shortcode") || "-"}
+              </Text>
+            </Box>
+            <Box display="flex" alignItems="center">
+              <Text variant="paragraph" size="default" color="gray" marginRight={1}>
+                Base Project:
+              </Text>
+              <Text variant="paragraph" size="default" fontWeight={500}>
+                {record.getCellValue("Base Shortcode")?.[0]?.value || "-"}
+              </Text>
+            </Box>
+          </Box>
+        </Box>
+
+        <Box>
+          {currentStatus && (
+            <ChoiceToken
+              choice={currentStatus}
+              size="xlarge"
+              marginLeft={2}
+              elevation={2}
+              animated={true}
+            />
+          )}
+        </Box>
+      </Box>
       {/* Jobs Section */}
       <Box marginTop={3}>
         <Box width="98%" margin="0 auto">
@@ -140,6 +172,8 @@ function NotesGrid({ record, notesTable }) {
           borderRadius={2}
           display="flex"
           flexDirection="column"
+          borderColor="transparent"
+          opacity={!notes ? 0.7 : 1}
         >
           <Box display="flex" justifyContent="space-between" marginBottom={1}>
             <Box display="flex" flexDirection="row" alignItems="center">
