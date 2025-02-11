@@ -76,7 +76,10 @@ export class AirtableService {
     return {
       fields: this.getRequiredProjectFields(),
       sorts: [
-        { field: this.projectsTable.getFieldByName("Flight Date"), direction: "desc" as const },
+        {
+          field: this.projectsTable.getFieldByName("Flight Date"),
+          direction: "desc" as const,
+        },
       ],
     };
   }
@@ -87,14 +90,35 @@ export class AirtableService {
 
   filterProjects(records: Project[], searchTerm: string): Project[] {
     const term = searchTerm.toLowerCase().trim();
-    // if (!term) return [];
 
-    return records.filter((record) => {
+    const filtered = records.filter((record) => {
+      if (!record || typeof record.getCellValue !== "function") {
+        console.warn(
+          "[AirtableService.filterProjects] Invalid record:",
+          record,
+        );
+        return false;
+      }
+
       const name = String(record.getCellValue("Name") || "").toLowerCase();
-      const shortcode = String(record.getCellValue("Shortcode") || "").toLowerCase();
+      const shortcode = String(
+        record.getCellValue("Shortcode") || "",
+      ).toLowerCase();
 
       return name.includes(term) || shortcode.includes(term);
     });
+
+    console.log("[AirtableService.filterProjects] Results:", {
+      matchingRecords: filtered.length,
+      firstMatch: filtered[0]
+        ? {
+            name: filtered[0].getCellValue("Name"),
+            shortcode: filtered[0].getCellValue("Shortcode"),
+          }
+        : null,
+    });
+
+    return filtered;
   }
   getJobFields(): Field[] {
     return [
@@ -117,14 +141,24 @@ export class AirtableService {
 
   getLinkedJobsQuery(record: Project) {
     return record.selectLinkedRecordsFromCell("Jobs", {
-      sorts: [{ field: this.jobsTable.getFieldByName("Created Date"), direction: "asc" as const }],
+      sorts: [
+        {
+          field: this.jobsTable.getFieldByName("Created Date"),
+          direction: "asc" as const,
+        },
+      ],
       fields: this.getJobFields(),
     });
   }
 
   getLinkedNotesQuery(record: Project) {
     return record.selectLinkedRecordsFromCell("Notes", {
-      sorts: [{ field: this.notesTable.getFieldByName("Created At"), direction: "desc" as const }],
+      sorts: [
+        {
+          field: this.notesTable.getFieldByName("Created At"),
+          direction: "desc" as const,
+        },
+      ],
       fields: this.getNoteFields(),
     });
   }
@@ -145,7 +179,7 @@ export class AirtableService {
   }
 
   getRecentProjectCardFields(): Field[] {
-    //probably don't need both of these?
+    //probably don't need both of these? nope we definitely do
     return [
       this.projectsTable.getFieldByName("Name"),
       this.projectsTable.getFieldByName("Shortcode"),

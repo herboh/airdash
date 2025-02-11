@@ -3,16 +3,8 @@ import { Box, Input, RecordCardList } from "@airtable/blocks/ui";
 import { AirtableService, Project } from "../airtableService";
 import { useAppState } from "../appState.tsx";
 
-interface SearchBarProps {
-  records: Project[];
-  onSelectRecord: (record: Project) => void;
-  onSearchActiveChange: (active: boolean) => void;
-  airtableService: AirtableService;
-}
-
 export default function SearchBar() {
-  const { searchTerm, handleSearch, filteredRecords, handleRecordSelect, airtableService } =
-    useAppState();
+  const { searchTerm, handleSearch } = useAppState();
 
   return (
     <Box>

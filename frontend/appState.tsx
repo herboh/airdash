@@ -1,8 +1,22 @@
 import React from "react";
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
-import { useBase, useLoadable, useWatchable, useCursor, useRecords } from "@airtable/blocks/ui";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
+import {
+  useBase,
+  useLoadable,
+  useWatchable,
+  useCursor,
+  useRecords,
+} from "@airtable/blocks/ui";
 import { AirtableService, Project } from "./airtableService";
 
+// set up type accepted by methods and props that will interact with AppState aka change when to render
 interface AppState {
   selectedRecord: Project | null;
   isSearchActive: boolean;
@@ -16,7 +30,7 @@ interface AppState {
   setIsSearchActive: (active: boolean) => void;
   setFilteredRecords: (records: Project[]) => void;
   handleRecordSelect: (record: Project) => void;
-  handleClose: (record: Project) => void;
+  handleClose: () => void;
   airtableService: AirtableService;
 }
 
@@ -27,15 +41,13 @@ interface AppStateProviderProps {
 }
 
 export function AppStateProvider({ children }: AppStateProviderProps) {
-  console.log("AppStateProvider initializing");
   const base = useBase();
-  const table = base;
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRecord, setSelectedRecord] = useState<Project | null>(null);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [filteredRecords, setFilteredRecords] = useState<Project[]>([]);
   const airtableService = useMemo(() => new AirtableService(base), [base]);
-  const records = useRecords(airtableService.getProjectView()) as Project[];
+  const records = useRecords(airtableService.getProjectView());
 
   // Watch for cursor data and selected record in Airtable
   const cursor = useCursor();
@@ -44,7 +56,9 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
 
   useEffect(() => {
     if (cursor.selectedRecordIds?.length > 0) {
-      const selected = records?.find((record) => record.id === cursor.selectedRecordIds[0]);
+      const selected = records?.find(
+        (record) => record.id === cursor.selectedRecordIds[0],
+      );
       if (selected && selected.id !== selectedRecord?.id) {
         handleRecordSelect(selected);
       }
@@ -61,26 +75,17 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
       if (record.id !== selectedRecord?.id) {
         setSelectedRecord(record);
         setIsSearchActive(false);
-        setSearchTerm("");
-        setFilteredRecords([]);
-        const newRecentIds = [
-          record.id,
-          ...recentProjectIds.filter((id) => id !== record.id),
-        ].slice(0, 5); // Keep only the 5 most recent
-
-        setRecentProjectIds(newRecentIds);
-        localStorage.setItem("recentProjectIds", JSON.stringify(newRecentIds));
       }
     },
-    [selectedRecord?.id, recentProjectIds],
+    [selectedRecord],
   );
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setSelectedRecord(null);
     setIsSearchActive(false);
     setSearchTerm("");
     setFilteredRecords([]);
-  };
+  }, []);
 
   const handleSearch = useCallback(
     (userInput: string) => {
@@ -115,14 +120,17 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
     airtableService,
   };
 
-  //needed to change file to .tsx and import React for this to work
-  return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
+  return (
+    <AppStateContext.Provider value={value}>
+      {children}
+    </AppStateContext.Provider>
+  );
 }
 
-export function useAppState(): AppState {
+export const useAppState = (): AppState => {
   const context = useContext(AppStateContext);
   if (context === undefined) {
     throw new Error("useAppState must be used within an AppStateProvider");
   }
   return context;
-}
+};
