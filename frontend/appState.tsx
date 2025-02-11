@@ -48,22 +48,61 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
   const [filteredRecords, setFilteredRecords] = useState<Project[]>([]);
   const airtableService = useMemo(() => new AirtableService(base), [base]);
   const records = useRecords(airtableService.getProjectView());
+  //removing for now//const jobRecords = useRecords(airtableService.)
 
   // Watch for cursor data and selected record in Airtable
   const cursor = useCursor();
   useLoadable(cursor);
   useWatchable(cursor, ["selectedRecordIds"]);
 
+  //old functional project lookup by mouse click
+  // useEffect(() => {
+  //     if (cursor.selectedRecordIds?.length > 0) {
+  //       const selected = records?.find(
+  //         (record) => record.id === cursor.selectedRecordIds[0],
+  //       );
+  //       if (selected && selected.id !== selectedRecord?.id) {
+  //         handleRecordSelect(selected);
+  //       }
+  //     }
+  //   }, [cursor.selectedRecordIds, records, selectedRecord?.id]);
+
+  //trying to do both projects and jobs table
   useEffect(() => {
     if (cursor.selectedRecordIds?.length > 0) {
-      const selected = records?.find(
-        (record) => record.id === cursor.selectedRecordIds[0],
-      );
-      if (selected && selected.id !== selectedRecord?.id) {
-        handleRecordSelect(selected);
+      const selectedTable = cursor.activeTableId; // Get the current table ID
+      const [selectedRecordId] = cursor.selectedRecordIds;
+
+      if (selectedTable === airtableService.projectsTable.id) {
+        // When selecting a project, set the selected record directly
+        const projectRecord = records.find(
+          (record) => record.id === selectedRecordId,
+        );
+        if (projectRecord) {
+          setSelectedRecord(projectRecord); //needs to call handle record select
+        }
+      } else if (selectedTable === airtableService.jobsTable.id) {
+        const jobRecord = jobsTable.getRecordByIdIfExists(selectedRecordId);
+
+
+        // When selecting a job, find :width: ,its linked project
+        const cellValue = selectedRecordIds.(
+            (record) => record.id === selectedRecordId
+        );
+        const linkedProject =
+          airtableService.getLinkedProjectFromJob(jobRecord);
+
+        if (linkedProject) {
+          setSelectedRecord(linkedProject);
+        }
       }
     }
-  }, [cursor.selectedRecordIds, records, selectedRecord?.id]);
+  }, [
+    cursor.selectedRecordIds,
+    cursor.activeTableId,
+    records,
+    airtableService,
+  ]);
 
   const [recentProjectIds, setRecentProjectIds] = useState<string[]>(() => {
     const stored = localStorage.getItem("recentProjectIds");
@@ -75,6 +114,15 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
       if (record.id !== selectedRecord?.id) {
         setSelectedRecord(record);
         setIsSearchActive(false);
+
+        setRecentProjectIds((prev) => {
+          const updatedList = [
+            record.id,
+            ...prev.filter((id) => id !== record.id),
+          ].slice(0, 8);
+          localStorage.setItem("recentProjectIds", JSON.stringify(updatedList));
+          return updatedList;
+        });
       }
     },
     [selectedRecord],
