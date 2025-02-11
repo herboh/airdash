@@ -25,15 +25,14 @@ interface ProjectOverviewProps {
 
 export default function ProjectOverview({
   record,
-  isSearchActive,
   jobsTable,
   notesTable,
   airtableService,
 }: ProjectOverviewProps) {
+  console.log("Rendering ProjectOverview", { record });
   const linkedJobsQuery = React.useMemo(() => {
     return airtableService.getLinkedJobsQuery(record);
   }, [record, airtableService]);
-
   const linkedJobs = useRecords(linkedJobsQuery) || [];
 
   if (!linkedJobs.length) return <Loader />;

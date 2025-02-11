@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Text, RecordCardList } from "@airtable/blocks/ui";
 import { Table } from "@airtable/blocks/models";
 import { AirtableService, Project } from "../airtableService";
+import { AppStateProvider, useAppState } from "../appState";
 
 interface RecentProjectsProps {
   records: Project[];
@@ -16,6 +17,7 @@ export default function RecentProjects({
   onSelectRecord,
   airtableService,
 }: RecentProjectsProps) {
+  const { handleRecordSelect } = useAppState();
   const recentProjects = React.useMemo(() => {
     if (!recentIds || !records) return [];
     return airtableService.getRecentProjects(records, recentIds);
@@ -32,6 +34,11 @@ export default function RecentProjects({
         <RecordCardList
           records={recentProjects}
           fields={airtableService.getRecentProjectCardFields()}
+          onRecordClick={(record) => {
+            if (record) {
+              handleRecordSelect(record as Project);
+            }
+          }}
         />
       </Box>
     </Box>

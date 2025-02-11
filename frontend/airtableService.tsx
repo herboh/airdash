@@ -52,10 +52,12 @@ export class AirtableService {
 
   constructor(base: Base) {
     this.base = base;
+
     this.projectsTable = base.getTableByName("Projects");
     this.jobsTable = base.getTableByName("Jobs");
     this.notesTable = base.getTableByName("Notes");
     this.projectView = this.projectsTable.getViewByName("All Projects View");
+    console.log("AirtableService initialized successfully");
   }
 
   getRequiredProjectFields(): Field[] {
@@ -83,6 +85,17 @@ export class AirtableService {
     return this.projectView;
   }
 
+  filterProjects(records: Project[], searchTerm: string): Project[] {
+    const term = searchTerm.toLowerCase().trim();
+    // if (!term) return [];
+
+    return records.filter((record) => {
+      const name = String(record.getCellValue("Name") || "").toLowerCase();
+      const shortcode = String(record.getCellValue("Shortcode") || "").toLowerCase();
+
+      return name.includes(term) || shortcode.includes(term);
+    });
+  }
   getJobFields(): Field[] {
     return [
       this.jobsTable.getFieldByName("Type"),
@@ -132,6 +145,7 @@ export class AirtableService {
   }
 
   getRecentProjectCardFields(): Field[] {
+    //probably don't need both of these?
     return [
       this.projectsTable.getFieldByName("Name"),
       this.projectsTable.getFieldByName("Shortcode"),

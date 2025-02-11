@@ -1,17 +1,12 @@
 import {
+  RecordCardList,
   initializeBlock,
   useBase,
-  useLoadable,
-  useWatchable,
-  useCursor,
-  useRecords,
   Box,
   Text,
   Heading,
   Button,
 } from "@airtable/blocks/ui";
-import { cursor } from "@airtable/blocks";
-import { FieldType } from "@airtable/blocks/models";
 import React, { useState, useEffect } from "react";
 import ProjectOverview from "./components/ProjectOverview";
 import SearchBar from "./components/SearchBar";
@@ -25,76 +20,77 @@ function App() {
       <AppContent />
     </AppStateProvider>
   );
+}
 
-  function AppContent() {
-    const {
-      selectedRecord,
-      isSearchActive,
-      records,
-      recentProjectIds,
-      setSelectedRecord,
-      setIsSearchActive,
-      handleRecordSelect,
-      airtableService,
-    } = useAppState();
+function AppContent() {
+  const {
+    selectedRecord,
+    isSearchActive,
+    filteredRecords,
+    searchTerm,
+    records,
+    recentProjectIds,
+    setSelectedRecord,
+    setIsSearchActive,
+    handleRecordSelect,
+    handleClose,
+    airtableService,
+  } = useAppState();
 
-    const base = useBase();
-    const jobsTable = base.getTableByName("Jobs");
-    const notesTable = base.getTableByName("Notes");
+  const base = useBase();
+  const jobsTable = base.getTableByName("Jobs");
+  const notesTable = base.getTableByName("Notes");
 
-    return (
-      <Box>
-        <SearchBar
-          records={records}
-          onSelectRecord={handleRecordSelect}
-          onSearchActiveChange={setIsSearchActive}
-          airtableService={airtableService}
-        />
-
-        {selectedRecord ? (
-          <Box>
-            <Box
-              marginBottom={2}
-              display="flex"
-              justifyContent="space-between"
+  return (
+    <Box>
+      {/* always on top*/}
+      <SearchBar />
+      {/* main 'window' area */}
+      {isSearchActive ? (
+        // Search results view
+        <Box padding={3}>
+          {searchTerm.trim() === "" ? (
+            <Text>Start typing to search...</Text>
+          ) : filteredRecords.length > 0 ? (
+            <RecordCardList
+              records={filteredRecords}
+              fields={airtableService.getProjectCardFields()}
               width="98%"
               margin="0 auto"
-            >
-              <Heading>
-                {isSearchActive ? "Pick a Project from the List" : "Project Overview"}
-              </Heading>
-              <Button
-                variant="default"
-                onClick={() => {
-                  setSelectedRecord(null);
-                  setIsSearchActive(false);
-                }}
-              >
-                Close
-              </Button>
-            </Box>
-            <ProjectOverview
-              record={selectedRecord}
-              jobsTable={jobsTable}
-              notesTable={notesTable}
-              isSearchActive={isSearchActive}
-              airtableService={airtableService}
+              onRecordClick={(record) => {
+                handleRecordSelect(record as Project);
+                setIsSearchActive(false); // Close search view after selection
+              }}
             />
-          </Box>
-        ) : (
-          <Box padding={3}>
-            <Text marginBottom={3}>
-              Select a project from the table or use the search bar above
-            </Text>
-            <RecentProjects
-              records={records}
-              recentIds={recentProjectIds}
-              onSelectRecord={handleRecordSelect}
-              airtableService={airtableService}
-            />
-          </Box>
-        )}
-      </Box>
-    );
-  }
+          ) : (
+            <Text>No matching projects found</Text>
+          )}
+        </Box>
+      ) : selectedRecord ? (
+        // Project details view
+        <Box>
+          <ProjectOverview
+            record={selectedRecord}
+            jobsTable={jobsTable}
+            notesTable={notesTable}
+            isSearchActive={isSearchActive}
+            airtableService={airtableService}
+          />
+        </Box>
+      ) : (
+        <Box padding={3}>
+          <Text marginBottom={3}>Select a project...</Text>
+          <RecentProjects
+            records={records}
+            recentIds={recentProjectIds}
+            onSelectRecord={handleRecordSelect}
+            airtableService={airtableService}
+          />
+        </Box>
+      )}
+    </Box>
+  );
 }
+
+console.log("Initializing Airtable block...");
+initializeBlock(() => <App />);
