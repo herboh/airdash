@@ -1,6 +1,6 @@
 import { Base, Table, Record, Field, View } from "@airtable/blocks/models";
 
-//determine what and how other files can interact with
+// Type Definitions
 export interface Project extends Record {
   id: string;
   name: string;
@@ -43,46 +43,60 @@ export interface ProjectFields {
   Shortcode: string;
 }
 
-//make the airtable lookup function available
+//Only way to talk to airtable db
 export class AirtableService {
   public readonly base: Base;
   public readonly projectsTable: Table;
   public readonly jobsTable: Table;
   public readonly notesTable: Table;
-  public readonly projectView: View; //ideally this should always be 'All Projects'
-  //skip for now//public readonly jobView: View; //heavy testing,
+  public readonly projectView: View;
 
+  //sets up airtable values. Could be done with IDs instead of names
   constructor(base: Base) {
     this.base = base;
-
-    //build the structure in into mem
     this.projectsTable = base.getTableByName("Projects");
     this.jobsTable = base.getTableByName("Jobs");
     this.notesTable = base.getTableByName("Notes");
     this.projectView = this.projectsTable.getViewByName("All Projects View");
-    //going to try to do this wihtout loading//this.jobView = this.jobsTable.getViewByName("All Jobs View");//could limit this by year to reduce memory
     console.log("AirtableService initialized successfully");
   }
 
-  //get important values and nothing else
-  getRequiredProjectFields(): Field[] {
-    return [
-      this.projectsTable.getFieldByName("Name"),
-      this.projectsTable.getFieldByName("Flight Date"),
-      this.projectsTable.getFieldByName("Block"),
-      this.projectsTable.getFieldByName("Site"),
-      this.projectsTable.getFieldByName("Status"),
-      this.projectsTable.getFieldByName("Base Shortcode"),
-      this.projectsTable.getFieldByName("Shortcode"),
-    ];
+  //concise way to request Project information from airtable
+  getProjectFields(): { [key: string]: Field[] } {
+    return {
+      required: [
+        this.projectsTable.getFieldByName("Name"),
+        this.projectsTable.getFieldByName("Flight Date"),
+        this.projectsTable.getFieldByName("Block"),
+        this.projectsTable.getFieldByName("Site"),
+        this.projectsTable.getFieldByName("Status"),
+        this.projectsTable.getFieldByName("Base Shortcode"),
+        this.projectsTable.getFieldByName("Shortcode"),
+      ],
+      // Fields needed for project cards
+      card: [
+        this.projectsTable.getFieldByName("Name"),
+        this.projectsTable.getFieldByName("Shortcode"),
+        this.projectsTable.getFieldByName("Base Shortcode"),
+        this.projectsTable.getFieldByName("Flight Date"),
+        this.projectsTable.getFieldByName("Status"),
+      ],
+      // Fields for recent project cards
+      recent: [
+        this.projectsTable.getFieldByName("Name"),
+        this.projectsTable.getFieldByName("Shortcode"),
+        this.projectsTable.getFieldByName("Flight Date"),
+        this.projectsTable.getFieldByName("Status"),
+      ],
+    };
   }
 
+  // Sort once
   getProjectViewConfig() {
     return {
-      fields: this.getRequiredProjectFields(),
+      fields: this.getProjectFields().required,
       sorts: [
         {
-          //sort once to avoid doing it on every search
           field: this.projectsTable.getFieldByName("Flight Date"),
           direction: "desc" as const,
         },
@@ -90,62 +104,51 @@ export class AirtableService {
     };
   }
 
-  //give other functions the ability to see this
+  //could be wrong but i think this is actually the step that loads the DB into memory
+  //I think it only loads once and then is accessed in mem every time after that (except for jobs)
   getProjectView() {
     return this.projectView;
   }
 
-  //filter the list of projects loaded in memory to support search function
-  filterProjects(records: Project[], searchTerm: string): Project[] {
-    const term = searchTerm.toLowerCase().trim();
-
-    const filtered = records.filter((record) => {
-      if (!record || typeof record.getCellValue !== "function") {
-        console.warn(
-          "[AirtableService.filterProjects] Invalid record:",
-          record,
-        );
-        return false;
-      }
-
-      //search by shortcode too, should add base here
-      const name = String(record.getCellValue("Name") || "").toLowerCase();
-      const shortcode = String(
-        record.getCellValue("Shortcode") || "",
-      ).toLowerCase();
-
-      return name.includes(term) || shortcode.includes(term);
-    });
-
-    return filtered;
+  getJobFields(): { [key: string]: Field[] } {
+    return {
+      // Builds the job card in ProjectOverview.tsx
+      full: [
+        this.jobsTable.getFieldByName("Type"),
+        this.jobsTable.getFieldByName("State"),
+        this.jobsTable.getFieldByName("Created Date"),
+        this.jobsTable.getFieldByName("Date Done"),
+        this.jobsTable.getFieldByName("Assignee"),
+        this.jobsTable.getFieldByName("Projects"),
+      ],
+      // Returns an array of records, only way I could figure out how to get linked projects efficiently
+      lookup: [this.jobsTable.getFieldByName("Projects")],
+    };
   }
 
-  //fields to populate job RecordCard
-  getJobFields(): Field[] {
-    return [
-      this.jobsTable.getFieldByName("Type"),
-      this.jobsTable.getFieldByName("State"),
-      this.jobsTable.getFieldByName("Created Date"),
-      this.jobsTable.getFieldByName("Date Done"),
-      this.jobsTable.getFieldByName("Assignee"),
-      this.jobsTable.getFieldByName("Projects"),
-    ];
-  }
-
-  //untested, try and make the extension work on jobs table too
-  getLinkedProjectFromJob(job: Job): Project | null {
-    const linkedProjects = job.selectLinkedRecordsFromCell("Projects", {
-      fields: this.getProjectCardFields(),
+  //select record that matches
+  async getProjectFromJobId(jobId: string): Promise<Project | null> {
+    const queryResult = this.jobsTable.selectRecords({
+      fields: this.getJobFields().lookup,
     });
 
-    if (linkedProjects.records.length > 0) {
-      // Assuming a Job is only linked to one Project; take the first one
-      return linkedProjects.records[0] as Project;
+    // Make sure the query has loaded its data.
+    await queryResult.loadDataAsync();
+
+    const jobRecord = queryResult.getRecordByIdIfExists(jobId);
+    if (!jobRecord) {
+      return null;
     }
 
-    return null;
+    //finally associate it with projectID and return projectRecord to use in handleRecordSelect
+    const linkedProjects = jobRecord.selectLinkedRecordsFromCell("Projects");
+    await linkedProjects.loadDataAsync();
+
+    const projectRecord = (linkedProjects.records[0] as Project) || null;
+    return projectRecord;
   }
 
+  // Note fields - haven't looked at this in forever
   getNoteFields(): Field[] {
     return [
       this.notesTable.getFieldByName("Created At"),
@@ -155,16 +158,39 @@ export class AirtableService {
     ];
   }
 
-  //gets list of jobs associated with project
+  // This seems janky, should I debounce here or in appState. appState seems more related to frontend, leaving it there
+  filterProjects(records: Project[], searchTerm: string): Project[] {
+    const term = searchTerm.toLowerCase().trim();
+
+    return records.filter((record) => {
+      if (!record || typeof record.getCellValue !== "function") {
+        console.warn(
+          "[AirtableService.filterProjects] Invalid record:",
+          record,
+        );
+        return false;
+      }
+
+      const name = String(record.getCellValue("Name") || "").toLowerCase();
+      const shortcode = String(
+        record.getCellValue("Shortcode") || "",
+      ).toLowerCase();
+
+      return name.includes(term) || shortcode.includes(term); //need to re-add base project lookup as well.
+      //base project is tricky because it's stored as an array
+    });
+  }
+
+  // This populates the jobs in ProjectOVerview.tsx.
   getLinkedJobsQuery(record: Project) {
     return record.selectLinkedRecordsFromCell("Jobs", {
       sorts: [
         {
           field: this.jobsTable.getFieldByName("Created Date"),
-          direction: "asc" as const, //why is this ascending?
+          direction: "asc" as const, //Not sure if I made this ascending for a reason or not
         },
       ],
-      fields: this.getJobFields(),
+      fields: this.getJobFields().full,
     });
   }
 
@@ -180,32 +206,11 @@ export class AirtableService {
     });
   }
 
-  //get list of recent jobs in memory. this used to have weird json stuff but it seems like i fixed that
+  // Recent projects handling // similar to search. This is old and janky and weird but it works. Leaving it
   getRecentProjects(records: Project[], recentIds: string[]): Project[] {
+    const recordMap = new Map(records.map((r) => [r.id, r]));
     return recentIds
-      .map((id) => records.find((record) => record.id === id))
-      .filter((record): record is Project => record !== undefined);
-  }
-
-  //get cards for top box of project overview
-  getProjectCardFields(): Field[] {
-    return [
-      this.projectsTable.getFieldByName("Name"),
-      this.projectsTable.getFieldByName("Shortcode"),
-      this.projectsTable.getFieldByName("Base Shortcode"),
-      this.projectsTable.getFieldByName("Flight Date"),
-      this.projectsTable.getFieldByName("Status"),
-    ];
-  }
-
-  //get cards for recent projects
-  getRecentProjectCardFields(): Field[] {
-    //probably don't need both of these? nope we definitely do
-    return [
-      this.projectsTable.getFieldByName("Name"),
-      this.projectsTable.getFieldByName("Shortcode"),
-      this.projectsTable.getFieldByName("Flight Date"),
-      this.projectsTable.getFieldByName("Status"),
-    ];
+      .map((id) => recordMap.get(id))
+      .filter(Boolean) as Project[];
   }
 }

@@ -9,12 +9,8 @@ import {
   Loader,
   ChoiceToken,
 } from "@airtable/blocks/ui";
-import { Table, Record } from "@airtable/blocks/models";
+import { Table } from "@airtable/blocks/models";
 
-interface Note extends Record {
-  id: string;
-  getCellValue(fieldName: string): any;
-}
 interface ProjectOverviewProps {
   record: Project;
   isSearchActive: boolean;
@@ -23,6 +19,7 @@ interface ProjectOverviewProps {
   airtableService: AirtableService;
 }
 
+//define what goes on the main layout when a record is selected
 export default function ProjectOverview({
   record,
   jobsTable,
@@ -39,6 +36,7 @@ export default function ProjectOverview({
 
   const currentStatus = record.getCellValue("Status");
 
+  //TODO - fix. everthing below hasnt been cared for, particularly the Notes
   return (
     <Box margin={1}>
       {/* Project Header Section */}
@@ -67,7 +65,12 @@ export default function ProjectOverview({
 
           <Box display="flex" flexDirection="column" style={{ gap: "0.1rem" }}>
             <Box display="flex" alignItems="center">
-              <Text variant="paragraph" size="default" textColor="gray" marginRight={1}>
+              <Text
+                variant="paragraph"
+                size="default"
+                textColor="gray"
+                marginRight={1}
+              >
                 Shortcode:
               </Text>
               <Text variant="paragraph" size="default" fontWeight={500}>
@@ -75,7 +78,12 @@ export default function ProjectOverview({
               </Text>
             </Box>
             <Box display="flex" alignItems="center">
-              <Text variant="paragraph" size="default" textColor="gray" marginRight={1}>
+              <Text
+                variant="paragraph"
+                size="default"
+                textColor="gray"
+                marginRight={1}
+              >
                 Base Project:
               </Text>
               <Text variant="paragraph" size="default" fontWeight={500}>
@@ -85,7 +93,11 @@ export default function ProjectOverview({
           </Box>
         </Box>
 
-        <Box>{currentStatus && <ChoiceToken choice={currentStatus} marginLeft={2} />}</Box>
+        <Box>
+          {currentStatus && (
+            <ChoiceToken choice={currentStatus} marginLeft={2} />
+          )}
+        </Box>
       </Box>
 
       {/* Jobs Section */}
@@ -95,7 +107,13 @@ export default function ProjectOverview({
             Jobs: ({linkedJobs?.length || 0})
           </Heading>
         </Box>
-        <Box height="400px" border="thick" borderRadius={3} width="98%" margin="0 auto">
+        <Box
+          height="400px"
+          border="thick"
+          borderRadius={3}
+          width="98%"
+          margin="0 auto"
+        >
           <RecordCardList
             key={record.id}
             records={linkedJobs}
@@ -127,7 +145,11 @@ export default function ProjectOverview({
           height="200px"
           overflow="auto"
         >
-          <NotesGrid record={record} notesTable={notesTable} airtableService={airtableService} />
+          <NotesGrid
+            record={record}
+            notesTable={notesTable}
+            airtableService={airtableService}
+          />
         </Box>
       </Box>
     </Box>
@@ -205,7 +227,9 @@ function NotesGrid({ record, notesTable, airtableService }: NotesGridProps) {
           style={{ cursor: "pointer" }}
           onClick={() => setPage((p) => p + 1)}
         >
-          <Text textColor="light">Load more ({notes.length - visibleNotes.length} remaining)</Text>
+          <Text textColor="light">
+            Load more ({notes.length - visibleNotes.length} remaining)
+          </Text>
         </Box>
       )}
     </Box>

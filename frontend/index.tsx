@@ -4,17 +4,17 @@ import {
   useBase,
   Box,
   Text,
-  Heading,
-  Button,
 } from "@airtable/blocks/ui";
-import React, { useState, useEffect } from "react";
+import React from "react";
 import ProjectOverview from "./components/ProjectOverview";
 import SearchBar from "./components/SearchBar";
 import RecentProjects from "./components/RecentProjects";
-import { AirtableService, Project } from "./airtableService";
+import { Project } from "./airtableService";
 import { AppStateProvider, useAppState } from "./appState";
 import CloseButton from "./components/CloseButton.tsx";
 
+//starts the application
+//airtable likes to point @ index.js by default, need to change to index.tsx for code to get here
 function App() {
   return (
     <AppStateProvider>
@@ -37,6 +37,8 @@ function AppContent() {
     airtableService,
   } = useAppState();
 
+  //hmm this seems deprecated and handled elsewhere. proably should be imported.
+  //but its just defining the names so i guess its ok
   const base = useBase();
   const jobsTable = base.getTableByName("Jobs");
   const notesTable = base.getTableByName("Notes");
@@ -56,7 +58,7 @@ function AppContent() {
             <Box height="calc(100vh - 120px)" overflow="auto">
               <RecordCardList
                 records={filteredRecords}
-                fields={airtableService.getProjectCardFields()}
+                fields={airtableService.getProjectFields().card}
                 width="98%"
                 margin="0 auto"
                 onRecordClick={(record) => {
@@ -106,5 +108,4 @@ function AppContent() {
   );
 }
 
-console.log("Initializing Airtable block...");
 initializeBlock(() => <App />);

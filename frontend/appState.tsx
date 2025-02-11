@@ -1,9 +1,22 @@
 import React from "react";
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
-import { useBase, useLoadable, useWatchable, useCursor, useRecords } from "@airtable/blocks/ui";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+} from "react";
+import {
+  useBase,
+  useLoadable,
+  useWatchable,
+  useCursor,
+  useRecords,
+} from "@airtable/blocks/ui";
 import { AirtableService, Project } from "./airtableService";
 
-// set up type accepted by methods and props that will interact with AppState aka change when to render
+// set up type accepted, How you interact with AppState aka decide to render
 interface AppState {
   selectedRecord: Project | null;
   isSearchActive: boolean;
@@ -27,6 +40,7 @@ interface AppStateProviderProps {
   children: React.ReactNode;
 }
 
+//set and export initial state
 export function AppStateProvider({ children }: AppStateProviderProps) {
   const base = useBase();
   const [searchTerm, setSearchTerm] = useState("");
@@ -35,67 +49,24 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
   const [filteredRecords, setFilteredRecords] = useState<Project[]>([]);
   const airtableService = useMemo(() => new AirtableService(base), [base]);
   const records = useRecords(airtableService.getProjectView());
-  //removing for now//const jobRecords = useRecords(airtableService.)
-
-  // Watch for cursor data and selected record in Airtable
   const cursor = useCursor();
+
   useLoadable(cursor);
-  useWatchable(cursor, ["selectedRecordIds"]);
+  useWatchable(cursor, ["selectedRecordIds", "activeTableId"]);
 
-  //old functional project lookup by mouse click
-  // useEffect(() => {
-  //     if (cursor.selectedRecordIds?.length > 0) {
-  //       const selected = records?.find(
-  //         (record) => record.id === cursor.selectedRecordIds[0],
-  //       );
-  //       if (selected && selected.id !== selectedRecord?.id) {
-  //         handleRecordSelect(selected);
-  //       }
-  //     }
-  //   }, [cursor.selectedRecordIds, records, selectedRecord?.id]);
-  // // When selecting a job, find :width: ,its linked project
-  // const cellValue = selectedRecordIds.(
-  //     (record) => record.id === selectedRecordId
-  // );
-  // const linkedProject =
-  //   airtableService.getLinkedProjectFromJob(jobRecord);
-
-  //trying to do both projects and jobs table
-  useEffect(() => {
-    if (cursor.selectedRecordIds?.length > 0) {
-      const selectedTable = cursor.activeTableId; // Get the current table ID
-      const [selectedRecordId] = cursor.selectedRecordIds;
-
-      if (selectedTable === airtableService.projectsTable.id) {
-        // When selecting a project, set the selected record directly
-        const projectRecord = records.find((record) => record.id === selectedRecordId);
-        if (projectRecord) {
-          setSelectedRecord(projectRecord); //needs to call handle record select
-        }
-      } else if (selectedTable === airtableService.jobsTable.id) {
-        const jobRecord = selectedTable.getRecordByIdIfExists(selectedRecordId);
-        if (jobRecord) {
-          const linkedProjects = jobRecord.selectLinkedRecordsFromCell("Projects");
-          const projectRecord = linkedProjects.records[0];
-          setSelectedRecord(projectRecord || null);
-        }
-      }
-    }
-  }, [cursor.selectedRecordIds, cursor.activeTableId, records, airtableService]);
-
-  const [recentProjectIds, setRecentProjectIds] = useState<string[]>(() => {
-    const stored = localStorage.getItem("recentProjectIds");
-    return stored ? JSON.parse(stored) : [];
-  });
-
+  //Takes recordID and change the state when a new "project"  is selected. Mainly opens ProjectOverview.tsx
   const handleRecordSelect = useCallback(
     (record: Project) => {
       if (record.id !== selectedRecord?.id) {
         setSelectedRecord(record);
         setIsSearchActive(false);
 
+        //if project is unique, add to memory for "recent Projects"
         setRecentProjectIds((prev) => {
-          const updatedList = [record.id, ...prev.filter((id) => id !== record.id)].slice(0, 8);
+          const updatedList = [
+            record.id,
+            ...prev.filter((id) => id !== record.id),
+          ].slice(0, 7);
           localStorage.setItem("recentProjectIds", JSON.stringify(updatedList));
           return updatedList;
         });
@@ -104,6 +75,51 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
     [selectedRecord],
   );
 
+  useEffect(() => {
+    const handleSelectionChange = async () => {
+      if (!cursor.selectedRecordIds?.length) return;
+
+      const selectedTable = cursor.activeTableId;
+      const [selectedRecordId] = cursor.selectedRecordIds;
+      //get selection and run handRecordSelect with the recordID
+      try {
+        if (selectedTable === airtableService.projectsTable.id) {
+          const projectRecord = records.find(
+            (record) => record.id === selectedRecordId,
+          );
+          if (projectRecord) {
+            handleRecordSelect(projectRecord);
+          }
+
+          //else try to look up the linked project from job recordID
+        } else if (selectedTable === airtableService.jobsTable.id) {
+          const projectRecord =
+            await airtableService.getProjectFromJobId(selectedRecordId);
+          if (projectRecord) {
+            handleRecordSelect(projectRecord);
+          }
+        }
+      } catch (error) {}
+    };
+
+    //the timing here is a little wacky, had to move things to avoid calling before declared. Seems to work.
+    handleSelectionChange();
+  }, [
+    cursor.selectedRecordIds,
+    cursor.activeTableId,
+    records,
+    airtableService,
+    handleRecordSelect,
+  ]);
+
+  //list of recent projects in memory. odd spot, might should be moved
+  const [recentProjectIds, setRecentProjectIds] = useState<string[]>(() => {
+    const stored = localStorage.getItem("recentProjectIds");
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  //clear button. sort of works and needs to include clearing cursor and searchbar
+  //mainly returns to RecentProjects.tsx
   const handleClose = useCallback(() => {
     setSelectedRecord(null);
     setIsSearchActive(false);
@@ -111,22 +127,32 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
     setFilteredRecords([]);
   }, []);
 
+  //Search Projects. Clear main window, filter by input, already sorted by date
+  //mainly activates SearchBar.tsx
   const handleSearch = useCallback(
     (userInput: string) => {
       setSearchTerm(userInput);
       const trimmedInput = userInput.trim();
       setIsSearchActive(!!trimmedInput);
 
-      if (trimmedInput) {
-        const filtered = airtableService.filterProjects(records, trimmedInput);
-        setFilteredRecords(filtered);
-      } else {
-        setFilteredRecords([]);
-      }
+      const debounceTimer = setTimeout(() => {
+        if (trimmedInput) {
+          const filtered = airtableService.filterProjects(
+            records,
+            trimmedInput,
+          );
+          setFilteredRecords(filtered);
+        } else {
+          setFilteredRecords([]);
+        }
+      }, 200);
+
+      return () => clearTimeout(debounceTimer);
     },
     [records, airtableService],
   );
 
+  //this just publishes the state to the other files
   const value: AppState = {
     selectedRecord,
     isSearchActive,
@@ -144,9 +170,14 @@ export function AppStateProvider({ children }: AppStateProviderProps) {
     airtableService,
   };
 
-  return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
+  return (
+    <AppStateContext.Provider value={value}>
+      {children}
+    </AppStateContext.Provider>
+  );
 }
 
+//this was important many many moons ago, error check could probably be removed. Not touching unless it breaks.
 export const useAppState = (): AppState => {
   const context = useContext(AppStateContext);
   if (context === undefined) {

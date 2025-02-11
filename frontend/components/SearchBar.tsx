@@ -1,8 +1,8 @@
 import React from "react";
-import { Box, Input, RecordCardList } from "@airtable/blocks/ui";
-import { AirtableService, Project } from "../airtableService";
+import { Box, Input } from "@airtable/blocks/ui";
 import { useAppState } from "../appState.tsx";
 
+//draws a search bar
 export default function SearchBar() {
   const { searchTerm, handleSearch } = useAppState();
 
