@@ -15,7 +15,7 @@ interface ProjectOverviewProps {
   record: Project;
   isSearchActive: boolean;
   jobsTable: Table;
-  // notesTable: Table;
+  notesTable: Table;
   airtableService: AirtableService;
 }
 
@@ -23,18 +23,23 @@ interface ProjectOverviewProps {
 export default function ProjectOverview({
   record,
   jobsTable,
-  // notesTable,
+  notesTable,
   airtableService,
 }: ProjectOverviewProps) {
   console.log("Rendering ProjectOverview", { record });
   const linkedJobsQuery = React.useMemo(() => {
     return airtableService.getLinkedJobsQuery(record);
   }, [record, airtableService]);
+  const linkedNotesQuery = React.useMemo(() => {
+    return airtableService.getLinkedNotesQuery(record);
+  }, [record, airtableService]);
   const linkedJobs = useRecords(linkedJobsQuery) || [];
-
-  if (!linkedJobs.length) return <Loader />;
+  const linkedNotes = useRecords(linkedNotesQuery) || [];
 
   const currentStatus = record.getCellValue("Status");
+  const RECORD_CARD_HEIGHT = 94;
+  const jobHeight = linkedJobs.length * RECORD_CARD_HEIGHT;
+  const notesHeight = linkedNotes.length * RECORD_CARD_HEIGHT;
 
   //TODO - fix. everthing below hasnt been cared for, particularly the Notes
   return (
@@ -65,7 +70,12 @@ export default function ProjectOverview({
 
           <Box display="flex" flexDirection="column" style={{ gap: "0.1rem" }}>
             <Box display="flex" alignItems="center">
-              <Text variant="paragraph" size="default" textColor="gray" marginRight={1}>
+              <Text
+                variant="paragraph"
+                size="default"
+                textColor="gray"
+                marginRight={1}
+              >
                 Shortcode:
               </Text>
               <Text variant="paragraph" size="default" fontWeight={500}>
@@ -73,7 +83,12 @@ export default function ProjectOverview({
               </Text>
             </Box>
             <Box display="flex" alignItems="center">
-              <Text variant="paragraph" size="default" textColor="gray" marginRight={1}>
+              <Text
+                variant="paragraph"
+                size="default"
+                textColor="gray"
+                marginRight={1}
+              >
                 Base Project:
               </Text>
               <Text variant="paragraph" size="default" fontWeight={500}>
@@ -83,7 +98,11 @@ export default function ProjectOverview({
           </Box>
         </Box>
 
-        <Box>{currentStatus && <ChoiceToken choice={currentStatus} marginLeft={2} />}</Box>
+        <Box>
+          {currentStatus && (
+            <ChoiceToken choice={currentStatus} marginLeft={2} />
+          )}
+        </Box>
       </Box>
 
       {/* Jobs Section */}
@@ -93,7 +112,13 @@ export default function ProjectOverview({
             Jobs: ({linkedJobs?.length || 0})
           </Heading>
         </Box>
-        <Box height="400px" border="thick" borderRadius={3} width="98%" margin="0 auto">
+        <Box
+          border="thick"
+          borderRadius={3}
+          width="98%"
+          margin="0 auto"
+          style={{ height: jobHeight, overflow: "visible" }}
+        >
           <RecordCardList
             key={record.id}
             records={linkedJobs}
@@ -104,12 +129,10 @@ export default function ProjectOverview({
               jobsTable.getFieldByName("Date Done"),
               jobsTable.getFieldByName("Assignee"),
             ]}
-            height="400px"
             width="100%"
           />
         </Box>
       </Box>
-
       {/* Notes Section */}
       <Box marginTop={3}>
         <Box width="98%" margin="0 auto">
@@ -122,27 +145,36 @@ export default function ProjectOverview({
           borderRadius={3}
           width="98%"
           margin="0 auto"
-          height="200px"
-          overflow="auto"
+          style={{ height: notesHeight, overflow: "visible" }}
         >
-          {/* <NotesGrid record={record} notesTable={notesTable} airtableService={airtableService} /> */}
+          <RecordCardList
+            records={linkedNotes}
+            fields={[
+              notesTable.getFieldByName("Type"),
+              notesTable.getFieldByName("Assignee"),
+              notesTable.getFieldByName("Comments"),
+              notesTable.getFieldByName("Created"),
+            ]}
+            width="100%"
+          />
         </Box>
       </Box>
     </Box>
   );
 }
 
-interface NotesGridProps {
-  record: Project;
-  notesTable: Table;
-  airtableService: AirtableService;
-}
-
+// interface NotesGridProps {
+//   record: Project;
+//   notesTable: Table;
+//   airtableService: AirtableService;
+// }
+//
 // function NotesGrid({ record, notesTable, airtableService }: NotesGridProps) {
 //   const [page, setPage] = React.useState(1);
 //   const NOTES_PER_PAGE = 10;
 //
-//   // const notes = useRecords(airtableService.getLinkedNotesQuery(record)) || [];
+//   const notes = useRecords(airtableService.getLinkedNotesQuery(record)) || [];
+//   console.log("Fetched Notes:", notes);
 //
 //   const visibleNotes = React.useMemo(() => {
 //     return notes.slice(0, page * NOTES_PER_PAGE);
@@ -157,9 +189,9 @@ interface NotesGridProps {
 //   }
 //
 //   const renderNote = (note: any) => {
-//     const assignee = note.getCellValue("Assignee");
-//     const type = note.getCellValue("Type");
-//     const comments = note.getCellValue("Comments");
+//     const assignee = note.getCellValue("Assignee") || "Unknown";
+//     const type = note.getCellValue("Type") || "Unknown";
+//     const comments = note.getCellValue("Comments") || "No comments";
 //
 //     return (
 //       <Box
@@ -186,22 +218,25 @@ interface NotesGridProps {
 //     );
 //   };
 //
-//   // return (
-//   //   <Box padding={1}>
-//     {visibleNotes.map(renderNote)}
-//     {notes.length > visibleNotes.length && (
-//       <Box
-//         display="flex"
-//         justifyContent="center"
-//         marginTop={2}
-//         padding={2}
-//         backgroundColor="lightGray1"
-//         borderRadius={2}
-//         style={{ cursor: "pointer" }}
-//         onClick={() => setPage((p) => p + 1)}
-//       >
-//         <Text textColor="light">Load more ({notes.length - visibleNotes.length} remaining)</Text>
-//       </Box>
-//     )}
-//   </Box>
-// );
+//   return (
+//     <Box padding={1}>
+//       {visibleNotes.map(renderNote)}
+//       {notes.length > visibleNotes.length && (
+//         <Box
+//           display="flex"
+//           justifyContent="center"
+//           marginTop={2}
+//           padding={2}
+//           backgroundColor="lightGray1"
+//           borderRadius={2}
+//           style={{ cursor: "pointer" }}
+//           onClick={() => setPage((p) => p + 1)}
+//         >
+//           <Text textColor="light">
+//             Load more ({notes.length - visibleNotes.length} remaining)
+//           </Text>
+//         </Box>
+//       )}
+//     </Box>
+//   );
+// }

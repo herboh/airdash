@@ -147,14 +147,14 @@ export class AirtableService {
     return projectRecord;
   }
 
-  // Note fields - haven't looked at this in forever - surprise it was broken
-  // getNoteFields(): Field[] {
-  //   return [
-  //     this.notesTable.getFieldByName("Type"),
-  //     this.notesTable.getFieldByName("Comments"),
-  //     this.notesTable.getFieldByName("Assignee"),
-  //   ];
-  // }
+  getNoteFields(): Field[] {
+    return [
+      this.notesTable.getFieldByName("Type"),
+      this.notesTable.getFieldByName("Comments"),
+      this.notesTable.getFieldByName("Assignee"),
+      this.notesTable.getFieldByName("Created"),
+    ];
+  }
 
   // This seems janky, should I debounce here or in appState. appState seems more related to frontend, leaving it there
   filterProjects(records: Project[], searchTerm: string): Project[] {
@@ -162,12 +162,17 @@ export class AirtableService {
 
     return records.filter((record) => {
       if (!record || typeof record.getCellValue !== "function") {
-        console.warn("[AirtableService.filterProjects] Invalid record:", record);
+        console.warn(
+          "[AirtableService.filterProjects] Invalid record:",
+          record,
+        );
         return false;
       }
 
       const name = String(record.getCellValue("Name") || "").toLowerCase();
-      const shortcode = String(record.getCellValue("Shortcode") || "").toLowerCase();
+      const shortcode = String(
+        record.getCellValue("Shortcode") || "",
+      ).toLowerCase();
 
       return name.includes(term) || shortcode.includes(term); //need to re-add base project lookup as well.
       //base project is tricky because it's stored as an array
@@ -187,20 +192,23 @@ export class AirtableService {
     });
   }
 
-  // getLinkedNotesQuery(record: Project) {
-  //   return record.selectLinkedRecordsFromCell("Notes", {
-  //     sorts: [
-  //       {
-  //         direction: "desc" as const,
-  //       },
-  //     ],
-  //     fields: this.getNoteFields(),
-  //   });
-  // }
+  getLinkedNotesQuery(record: Project) {
+    return record.selectLinkedRecordsFromCell("Notes", {
+      sorts: [
+        {
+          field: this.notesTable.getFieldByName("Created"),
+          direction: "desc" as const,
+        },
+      ],
+      fields: this.getNoteFields(),
+    });
+  }
 
   // Recent projects handling // similar to search. This is old and janky and weird but it works. Leaving it
   getRecentProjects(records: Project[], recentIds: string[]): Project[] {
     const recordMap = new Map(records.map((r) => [r.id, r]));
-    return recentIds.map((id) => recordMap.get(id)).filter(Boolean) as Project[];
+    return recentIds
+      .map((id) => recordMap.get(id))
+      .filter(Boolean) as Project[];
   }
 }

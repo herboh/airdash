@@ -1,4 +1,10 @@
-import { RecordCardList, initializeBlock, useBase, Box, Text } from "@airtable/blocks/ui";
+import {
+  RecordCardList,
+  initializeBlock,
+  useBase,
+  Box,
+  Text,
+} from "@airtable/blocks/ui";
 import React from "react";
 import ProjectOverview from "./components/ProjectOverview";
 import SearchBar from "./components/SearchBar";
@@ -35,7 +41,7 @@ function AppContent() {
   //but its just defining the names so i guess its ok
   const base = useBase();
   const jobsTable = base.getTableByName("Jobs");
-  // const notesTable = base.getTableByName("Notes");
+  const notesTable = base.getTableByName("Notes");
 
   return (
     <Box>
@@ -57,11 +63,17 @@ function AppContent() {
                 margin="0 auto"
                 onRecordClick={(record) => {
                   // Type guard to ensure record matches Project interface
-                  if ("id" in record && typeof record.getCellValue === "function") {
+                  if (
+                    "id" in record &&
+                    typeof record.getCellValue === "function"
+                  ) {
                     handleRecordSelect(record as Project);
                     setIsSearchActive(false);
                   } else {
-                    console.error("[RecordCardList] Invalid record structure:", record);
+                    console.error(
+                      "[RecordCardList] Invalid record structure:",
+                      record,
+                    );
                   }
                 }}
               />
@@ -76,7 +88,7 @@ function AppContent() {
           <ProjectOverview
             record={selectedRecord}
             jobsTable={jobsTable}
-            // notesTable={notesTable}
+            notesTable={notesTable}
             isSearchActive={isSearchActive}
             airtableService={airtableService}
           />
